@@ -1,26 +1,139 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/*
+ * Design tokens. Tailwind v4 has no tailwind.config file: tokens declared in
+ * @theme become utilities (bg-canvas, text-ink, text-title-1, shadow-card,
+ * rounded-lg, h-row ...) and CSS variables (var(--color-accent)).
+ *
+ * Apple-inspired: system font, restrained neutrals, one accent blue, soft
+ * shadows, generous radii, subtle motion. Light theme only.
+ */
+@theme {
+  /* ---------- type ---------- */
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+    var(--font-inter), "Inter", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  /* Scale: size / line height / tracking. Dense views use callout and footnote;
+     /weekly and /login use body and up. */
+  --text-caption: 0.75rem;            /* 12 */
+  --text-caption--line-height: 1rem;
+  --text-footnote: 0.8125rem;         /* 13 */
+  --text-footnote--line-height: 1.125rem;
+  --text-callout: 0.875rem;           /* 14: dense default */
+  --text-callout--line-height: 1.25rem;
+  --text-body: 1.0625rem;             /* 17 */
+  --text-body--line-height: 1.5rem;
+  --text-body--letter-spacing: -0.01em;
+  --text-headline: 1.0625rem;         /* 17 semibold */
+  --text-headline--line-height: 1.375rem;
+  --text-headline--letter-spacing: -0.01em;
+  --text-headline--font-weight: 600;
+  --text-title-3: 1.25rem;            /* 20 */
+  --text-title-3--line-height: 1.5625rem;
+  --text-title-3--letter-spacing: -0.015em;
+  --text-title-3--font-weight: 600;
+  --text-title-2: 1.5rem;             /* 24 */
+  --text-title-2--line-height: 1.875rem;
+  --text-title-2--letter-spacing: -0.018em;
+  --text-title-2--font-weight: 600;
+  --text-title-1: 2rem;               /* 32 */
+  --text-title-1--line-height: 2.375rem;
+  --text-title-1--letter-spacing: -0.02em;
+  --text-title-1--font-weight: 700;
+  --text-large-title: 2.5rem;         /* 40 */
+  --text-large-title--line-height: 2.875rem;
+  --text-large-title--letter-spacing: -0.022em;
+  --text-large-title--font-weight: 700;
+  --text-display: 3.5rem;             /* 56: weekly hero */
+  --text-display--line-height: 3.75rem;
+  --text-display--letter-spacing: -0.025em;
+  --text-display--font-weight: 700;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  /* ---------- color ---------- */
+  --color-canvas: #f5f5f7;            /* page background */
+  --color-surface: #ffffff;           /* cards, grid, bars */
+  --color-surface-muted: #fafafc;     /* zebra rows, wells */
+  --color-ink: #1d1d1f;               /* primary text */
+  --color-ink-secondary: #6e6e73;     /* secondary text, 5.1:1 on white */
+  --color-ink-tertiary: #86868b;      /* hints, placeholders (not body text) */
+  --color-separator: #d2d2d7;
+  --color-hairline: rgb(0 0 0 / 0.08);
+  --color-accent: #0071e3;            /* the one accent blue */
+  --color-accent-hover: #0077ed;
+  --color-accent-pressed: #0062c4;
+  --color-accent-soft: #e8f1fc;
+  --color-danger: #c4001a;
+  --color-danger-soft: #fdeff1;
+  --color-warning: #a84e00;           /* assumptions, "est." */
+  --color-warning-soft: #fff4e5;
+
+  /* ---------- spacing (Tailwind's 4px scale stays; these are semantic) ---------- */
+  --spacing-row: 2.25rem;             /* 36px: max dense row height */
+  --spacing-bar: 3.25rem;             /* 52px: top bar */
+  --spacing-gutter: 1.5rem;           /* page side padding */
+  --spacing-section: 3rem;            /* between major sections */
+
+  /* ---------- radii ---------- */
+  --radius-sm: 0.375rem;              /* 6: inputs in dense views, tags */
+  --radius-md: 0.625rem;              /* 10: buttons, inputs */
+  --radius-lg: 0.875rem;              /* 14: cards */
+  --radius-xl: 1.25rem;               /* 20: large cards, weekly */
+  --radius-2xl: 1.75rem;              /* 28: hero surfaces, login */
+
+  /* ---------- shadows ---------- */
+  --shadow-hairline: 0 0 0 1px rgb(0 0 0 / 0.06);
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.04), 0 4px 16px rgb(0 0 0 / 0.04);
+  --shadow-raised: 0 2px 6px rgb(0 0 0 / 0.05), 0 12px 32px rgb(0 0 0 / 0.08);
+  --shadow-focus: 0 0 0 4px rgb(0 113 227 / 0.24);
+
+  /* ---------- motion ---------- */
+  --ease-apple: cubic-bezier(0.25, 0.1, 0.25, 1);
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-fade-in: fade-in 240ms var(--ease-out-soft) both;
+  --animate-rise-in: rise-in 320ms var(--ease-out-soft) both;
+
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes rise-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer base {
+  html {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    color-scheme: light;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    font-size: var(--text-callout);
+    line-height: var(--text-callout--line-height);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  :focus-visible {
+    outline: none;
+    box-shadow: var(--shadow-focus);
+  }
+
+  ::selection {
+    background-color: var(--color-accent-soft);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
