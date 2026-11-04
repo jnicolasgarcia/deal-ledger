@@ -25,9 +25,10 @@ CLI, and next build does not lint.
 - app/            routes: /deals, /weekly, /admin, /login
 - lib/            supabase clients, stages.ts (funnel + colors), shared helpers
 - proxy.ts        session refresh and route protection
-- scripts/        profile.py, ingest.py, create_demo_users.py, seed_users.py,
+- scripts/        profile_workbook.py, ingest.py, create_demo_users.py, seed_users.py,
                   test_rls.py, tests/
 - supabase/migrations/  numbered SQL files, run in order
+- supabase/checks/      SQL checks per migration, run in the SQL editor, end in rollback
 - data/source.xlsx      the source workbook (never modified, not committed)
 
 ## Commands
