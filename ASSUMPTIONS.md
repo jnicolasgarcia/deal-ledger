@@ -101,6 +101,9 @@ shows n/a for blanks.
   meaning is unambiguous: a plain number, optionally with `$` or thousands
   commas. Units, ranges or words (`15-51`, `2,400A`) stay text, and the
   numeric value stays null.
+- **Blank Client name:** fall back to the client part of the tab name
+  (`food_clientA_nyc` gives "Client A") and flag it as an issue. It's
+  derived from the tab, not invented.
 - **State:** a typed column next to City, but nullable, because the food
   tab doesn't have it.
 - **Vertical-specific fields** (Power, Clear height, Zoning, Miles from Airport
