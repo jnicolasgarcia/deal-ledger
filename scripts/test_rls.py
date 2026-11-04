@@ -28,21 +28,22 @@ EMAILS = {
     "admin": "admin@demo.dealledger.test",
     "editor": "editor@demo.dealledger.test",
     "viewer": "viewer@demo.dealledger.test",
+    "no role": "norole@demo.dealledger.test",
 }
-ACTORS = ["signed out", "viewer", "editor", "admin"]
+ACTORS = ["signed out", "no role", "viewer", "editor", "admin"]
 
 # True = the actor should be able to do it.
 EXPECTED: dict[str, dict[str, bool]] = {
-    "read deals":                  {"signed out": False, "viewer": False, "editor": True,  "admin": True},
-    "read deal_events":            {"signed out": False, "viewer": False, "editor": True,  "admin": True},
-    "call get_weekly_review":      {"signed out": False, "viewer": True,  "editor": True,  "admin": True},
-    "direct update on deals":      {"signed out": False, "viewer": False, "editor": False, "admin": False},
-    "update_deal, allowed field":  {"signed out": False, "viewer": False, "editor": True,  "admin": True},
-    "update_deal, natural_key":    {"signed out": False, "viewer": False, "editor": False, "admin": False},
-    "read own profile":            {"signed out": False, "viewer": True,  "editor": True,  "admin": True},
-    "read another user's profile": {"signed out": False, "viewer": False, "editor": False, "admin": True},
-    "change a role":               {"signed out": False, "viewer": False, "editor": False, "admin": True},
-    "call get_profile_names":      {"signed out": False, "viewer": False, "editor": True,  "admin": True},
+    "read deals":                  {"signed out": False, "no role": False, "viewer": False, "editor": True,  "admin": True},
+    "read deal_events":            {"signed out": False, "no role": False, "viewer": False, "editor": True,  "admin": True},
+    "call get_weekly_review":      {"signed out": False, "no role": False, "viewer": True,  "editor": True,  "admin": True},
+    "direct update on deals":      {"signed out": False, "no role": False, "viewer": False, "editor": False, "admin": False},
+    "update_deal, allowed field":  {"signed out": False, "no role": False, "viewer": False, "editor": True,  "admin": True},
+    "update_deal, natural_key":    {"signed out": False, "no role": False, "viewer": False, "editor": False, "admin": False},
+    "read own profile":            {"signed out": False, "no role": True, "viewer": True,  "editor": True,  "admin": True},
+    "read another user's profile": {"signed out": False, "no role": False, "viewer": False, "editor": False, "admin": True},
+    "change a role":               {"signed out": False, "no role": False, "viewer": False, "editor": False, "admin": True},
+    "call get_profile_names":      {"signed out": False, "no role": False, "viewer": False, "editor": True,  "admin": True},
 }
 
 

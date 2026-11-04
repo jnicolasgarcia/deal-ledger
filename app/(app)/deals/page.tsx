@@ -1,13 +1,13 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
-import { canUseDeals, requireUser } from "@/lib/auth";
+import { canUseDeals, homePathFor, requireUser } from "@/lib/auth";
 import { loadDeals } from "@/lib/deals-server";
 import { DealsView } from "./deals-view";
 
 /** Reads deals as the signed-in user (RLS: editors and admins only). */
 async function DealsData() {
   const user = await requireUser();
-  if (!canUseDeals(user.role)) redirect("/weekly"); // backstop for proxy.ts
+  if (!canUseDeals(user.role)) redirect(homePathFor(user.role)); // backstop for proxy.ts
 
   const result = await loadDeals();
   if ("error" in result) {

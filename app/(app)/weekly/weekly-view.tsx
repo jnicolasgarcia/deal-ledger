@@ -71,7 +71,7 @@ export function WeeklyView({ model }: { model: WeeklyModel }) {
     );
 
   return (
-    <div className="flex flex-col gap-8 print:gap-0">
+    <div className="flex flex-col gap-8 print:gap-0 print:px-2">
       <nav aria-label="Weekly review" className="flex flex-wrap items-center gap-3 print:hidden">
         <div className="flex flex-wrap gap-1 rounded-lg bg-black/4 p-1">
           {tab(OVERVIEW, "Overview")}

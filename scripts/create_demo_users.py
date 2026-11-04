@@ -1,8 +1,9 @@
-"""Create the three demo users and set their roles. Safe to run again.
+"""Create the demo users and set their roles. Safe to run again.
 
 - admin@demo.dealledger.test  -> admin
 - editor@demo.dealledger.test -> editor
 - viewer@demo.dealledger.test -> viewer
+- norole@demo.dealledger.test -> no role (tests the no-access path, 005)
 
 Uses the secret key (admin API) and DEMO_USER_PASSWORD from ../.env.local.
 An existing user gets its password reset to DEMO_USER_PASSWORD, its email
@@ -25,6 +26,7 @@ DEMO_USERS = [
     ("admin@demo.dealledger.test", "admin", "Demo Admin"),
     ("editor@demo.dealledger.test", "editor", "Demo Editor"),
     ("viewer@demo.dealledger.test", "viewer", "Demo Viewer"),
+    ("norole@demo.dealledger.test", None, "Demo No Role"),
 ]
 
 
@@ -67,10 +69,10 @@ def main() -> int:
             got = client.table("profiles").select("role").eq("user_id", user.id).single().execute().data
             ok = got and got["role"] == role
             failed |= not ok
-            print(f"{email:<30} {action:<9} {role:<7} {'ok' if ok else 'ROLE NOT SET: ' + str(got)}")
+            print(f"{email:<30} {action:<9} {role or 'none':<7} {'ok' if ok else 'ROLE NOT SET: ' + str(got)}")
         except Exception as exc:
             failed = True
-            print(f"{email:<30} {'error':<9} {role:<7} {exc}")
+            print(f"{email:<30} {'error':<9} {role or 'none':<7} {exc}")
     return 1 if failed else 0
 
 

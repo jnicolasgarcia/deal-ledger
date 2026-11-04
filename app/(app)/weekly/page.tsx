@@ -1,8 +1,12 @@
 import { Suspense } from "react";
+import { redirect } from "next/navigation";
+import { NO_ACCESS_PATH, requireUser } from "@/lib/auth";
 import { loadWeekly } from "@/lib/weekly-server";
 import { WeeklyView } from "./weekly-view";
 
 async function WeeklyData() {
+  const user = await requireUser();
+  if (!user.role) redirect(NO_ACCESS_PATH); // backstop for proxy.ts
   const result = await loadWeekly();
   if ("error" in result) {
     return (

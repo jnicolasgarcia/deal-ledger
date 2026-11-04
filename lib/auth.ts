@@ -49,8 +49,12 @@ export function canUseDeals(role: AppRole | null): boolean {
   return role === "editor" || role === "admin";
 }
 
-/** Where "/" sends a user: the deals grid for editors and admins, the weekly review otherwise. */
-export function homePathFor(role: AppRole | null): "/deals" | "/weekly" {
+/** No role (null) = no access until an admin grants one (005). */
+export const NO_ACCESS_PATH = "/no-access";
+
+/** Where "/" sends a user: deals for editors and admins, weekly for viewers, no-access otherwise. */
+export function homePathFor(role: AppRole | null): "/deals" | "/weekly" | typeof NO_ACCESS_PATH {
+  if (!role) return NO_ACCESS_PATH;
   return canUseDeals(role) ? "/deals" : "/weekly";
 }
 

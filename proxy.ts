@@ -3,6 +3,8 @@ import { createServerClient } from "@supabase/ssr";
 
 // Routes a signed-out visitor may open. Everything else redirects to /login.
 const PUBLIC_PATHS = new Set(["/login"]);
+// Signed in but no role yet (005): this page only.
+const NO_ACCESS = "/no-access";
 
 /**
  * Refreshes the Supabase session on every request (the only place it is
@@ -54,18 +56,22 @@ export async function proxy(request: NextRequest) {
   // Role-based routing, only where it matters (one profile read through RLS).
   // UX only: the database still decides what each role can read.
   const path = request.nextUrl.pathname;
-  const isDeals = path === "/deals" || path.startsWith("/deals/");
-  if (signedIn && (path === "/" || isDeals)) {
+  const under = (base: string) => path === base || path.startsWith(`${base}/`);
+  if (signedIn && (path === "/" || under("/deals") || under("/weekly") || under(NO_ACCESS))) {
     const { data: profile } = await supabase
       .from("profiles")
       .select("role")
       .eq("user_id", data!.claims.sub)
       .maybeSingle();
-    const canUseDeals = profile?.role === "editor" || profile?.role === "admin";
-    if (path === "/") {
-      return redirectTo(canUseDeals ? "/deals" : "/weekly", request, response, cacheHeaders);
-    }
-    if (!canUseDeals) return redirectTo("/weekly", request, response, cacheHeaders);
+    const role = profile?.role as string | null | undefined;
+    const canUseDeals = role === "editor" || role === "admin";
+    const home = !role ? NO_ACCESS : canUseDeals ? "/deals" : "/weekly";
+
+    if (path === "/") return redirectTo(home, request, response, cacheHeaders);
+    // No role: only the no-access page. With a role: no reason to stay there.
+    if (!role && !under(NO_ACCESS)) return redirectTo(NO_ACCESS, request, response, cacheHeaders);
+    if (role && under(NO_ACCESS)) return redirectTo(home, request, response, cacheHeaders);
+    if (under("/deals") && !canUseDeals) return redirectTo(home, request, response, cacheHeaders);
   }
   return response;
 }
