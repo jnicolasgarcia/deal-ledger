@@ -30,7 +30,9 @@ export async function POST(request: NextRequest) {
       },
     },
   );
-  await supabase.auth.signOut();
+  // Local scope: end this browser's session only. Demo accounts are shared,
+  // so signing out on one device mustn't end the others' sessions.
+  await supabase.auth.signOut({ scope: "local" });
   // Never let a browser or proxy keep any part of this response, and drop
   // cached pages for this site, including the back/forward cache, so Back
   // can't bring the previous user's page back (see also BfcacheGuard).
