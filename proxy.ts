@@ -37,6 +37,14 @@ export async function proxy(request: NextRequest) {
   // Keep this call directly after createServerClient: it validates the JWT
   // and refreshes the session if needed. Never trust getSession() here.
   const { data } = await supabase.auth.getClaims();
+
+  // Only page loads are redirected. Server actions are POSTs to the page's
+  // URL: redirecting one turns it into a request the client can't read, so
+  // the page never navigates (e.g. signing in from a /login tab while
+  // another tab is already signed in). Actions check auth themselves, and
+  // RLS still applies to everything they touch.
+  if (request.method !== "GET" && request.method !== "HEAD") return response;
+
   const signedIn = Boolean(data?.claims?.sub);
   const isPublic = PUBLIC_PATHS.has(request.nextUrl.pathname);
 
