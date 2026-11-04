@@ -2,6 +2,9 @@
 
 import type { CustomCellRendererProps } from "ag-grid-react";
 import { StagePill } from "@/app/_components/stage-pill";
+import { Assumption, NotAvailable } from "@/app/_components/value-marks";
+
+export { Assumption, NotAvailable };
 import {
   formatAttribute,
   formatNumber,
@@ -11,38 +14,7 @@ import {
   type NumberKind,
 } from "@/lib/deals";
 
-export const ASSUMPTION_TOOLTIP = "Assumption, not yet confirmed";
 export const NO_STAGE_HISTORY_TOOLTIP = "No stage history before import";
-
-/** Muted placeholder for missing values. Never a blank cell. */
-export function NotAvailable({ title }: { title?: string }) {
-  return (
-    <span className="text-ink-tertiary" title={title}>
-      n/a
-    </span>
-  );
-}
-
-/** Italic, secondary color, "est." badge: a value entered before confirmed data existed. */
-export function Assumption({ children, align = "left" }: { children: React.ReactNode; align?: "left" | "right" }) {
-  return (
-    <span
-      title={ASSUMPTION_TOOLTIP}
-      className={`flex min-w-0 items-center gap-1.5 italic text-ink-secondary ${align === "right" ? "justify-end" : ""}`}
-    >
-      <span className="truncate">{children}</span>
-      <EstBadge />
-    </span>
-  );
-}
-
-export function EstBadge() {
-  return (
-    <span className="shrink-0 rounded-[4px] bg-warning-soft px-1 text-[11px] leading-4 font-medium not-italic text-warning">
-      est.
-    </span>
-  );
-}
 
 export type CellParams =
   | { kind: "text"; field: keyof DealRow }

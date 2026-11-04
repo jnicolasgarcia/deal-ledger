@@ -6,7 +6,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-full">
       <TopBar />
-      <main className="mx-auto max-w-[1440px] px-gutter py-6">{children}</main>
+      <main className="mx-auto max-w-[1440px] px-gutter py-6 print:max-w-none print:p-0">{children}</main>
     </div>
   );
 }

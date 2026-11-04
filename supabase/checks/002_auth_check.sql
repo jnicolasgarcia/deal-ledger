@@ -77,11 +77,13 @@ select pg_temp.ok('last-admin guard trigger on profiles', exists (
 select pg_temp.ok('signup trigger on auth.users', exists (
   select 1 from pg_trigger where tgrelid = 'auth.users'::regclass and tgname = 'on_auth_user_created'));
 
+-- Column list as of 004 (which added updated_at and imported_at).
 select pg_temp.ok('get_weekly_review returns only weekly columns',
   pg_get_function_result('public.get_weekly_review()'::regprocedure) =
   'TABLE(id uuid, vertical text, market text, address text, stage deal_stage, list_price numeric, '
   'bldg_sf numeric, list_price_per_sf numeric, lot_sf numeric, notes text, assumption_fields text[], '
-  'days_in_stage integer, previous_stage deal_stage)',
+  'days_in_stage integer, previous_stage deal_stage, updated_at timestamp with time zone, '
+  'imported_at timestamp with time zone)',
   pg_get_function_result('public.get_weekly_review()'::regprocedure));
 
 -- ---------- behaviour ----------

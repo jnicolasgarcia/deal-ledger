@@ -148,3 +148,19 @@
   background-color: rgb(0 113 227 / 0.06);
   cursor: text;
 }
+
+/* Print: the weekly review in landscape, one vertical per page (see /weekly). */
+@media print {
+  @page {
+    size: landscape;
+    margin: 8mm 10mm;
+  }
+  html,
+  body {
+    background: #fff !important;
+  }
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
