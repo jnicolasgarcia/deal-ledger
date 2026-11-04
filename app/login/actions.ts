@@ -4,7 +4,12 @@ import { redirect } from "next/navigation";
 import { getDb } from "@/lib/supabase/server";
 import { homePathFor, type AppRole } from "@/lib/auth";
 
-export type SignInState = { error: string | null; email: string };
+export type SignInState = {
+  error: string | null;
+  /** Which field the error belongs to, so the form can mark and focus it. */
+  field: "email" | "password" | "form" | null;
+  email: string;
+};
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -12,9 +17,10 @@ export async function signIn(_prev: SignInState, formData: FormData): Promise<Si
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
 
-  if (!email || !password) return { error: "Enter your email and password.", email };
-  if (email.length > 254 || !EMAIL_RE.test(email)) return { error: "Enter a valid email address.", email };
-  if (password.length > 256) return { error: "Email or password is incorrect.", email };
+  if (!email) return { error: "Enter your email address.", field: "email", email };
+  if (email.length > 254 || !EMAIL_RE.test(email)) return { error: "That doesn't look like an email address.", field: "email", email };
+  if (!password) return { error: "Enter your password.", field: "password", email };
+  if (password.length > 256) return { error: "Email or password is incorrect.", field: "form", email };
 
   const db = await getDb();
   const { data, error } = await db.auth.signInWithPassword({ email, password });
@@ -23,16 +29,14 @@ export async function signIn(_prev: SignInState, formData: FormData): Promise<Si
     const message =
       error?.code === "invalid_credentials"
         ? "Email or password is incorrect."
-        : "Couldn't sign in right now. Try again in a moment.";
-    return { error: message, email };
+        : error?.status === 429
+          ? "Too many attempts. Wait a minute, then try again."
+          : "Couldn't sign in right now. Try again in a moment.";
+    return { error: message, field: "form", email };
   }
 
   // Go straight to the role's home: a redirect from a server action renders
   // its target without passing through proxy.ts again.
-  const { data: profile } = await db
-    .from("profiles")
-    .select("role")
-    .eq("user_id", data.user.id)
-    .maybeSingle();
+  const { data: profile } = await db.from("profiles").select("role").eq("user_id", data.user.id).maybeSingle();
   redirect(homePathFor((profile?.role as AppRole | undefined) ?? null));
 }

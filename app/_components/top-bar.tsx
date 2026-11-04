@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { canUseDeals, requireUser } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { NavLinks } from "./nav-links";
 import { UserMenu, UserMenuSkeleton } from "./user-menu";
 
 /** Nav depends on the role, so it streams in with the session. */
 async function RoleNav() {
   const user = await requireUser();
-  return <NavLinks showDeals={canUseDeals(user.role)} />;
+  return <NavLinks role={user.role} />;
 }
 
 export function TopBar() {

@@ -57,7 +57,7 @@ export async function proxy(request: NextRequest) {
   // UX only: the database still decides what each role can read.
   const path = request.nextUrl.pathname;
   const under = (base: string) => path === base || path.startsWith(`${base}/`);
-  if (signedIn && (path === "/" || under("/deals") || under("/weekly") || under(NO_ACCESS))) {
+  if (signedIn && (path === "/" || under("/deals") || under("/weekly") || under("/admin") || under(NO_ACCESS))) {
     const { data: profile } = await supabase
       .from("profiles")
       .select("role")
@@ -71,7 +71,8 @@ export async function proxy(request: NextRequest) {
     // No role: only the no-access page. With a role: no reason to stay there.
     if (!role && !under(NO_ACCESS)) return redirectTo(NO_ACCESS, request, response, cacheHeaders);
     if (role && under(NO_ACCESS)) return redirectTo(home, request, response, cacheHeaders);
-    if (under("/deals") && !canUseDeals) return redirectTo(home, request, response, cacheHeaders);
+    // A role without access to /deals or /admin gets a friendly page from the
+    // server (NoAccessPanel), not a redirect.
   }
   return response;
 }

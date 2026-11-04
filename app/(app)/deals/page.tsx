@@ -1,13 +1,13 @@
 import { Suspense } from "react";
-import { redirect } from "next/navigation";
-import { canUseDeals, homePathFor, requireUser } from "@/lib/auth";
+import { canUseDeals, requireUser } from "@/lib/auth";
+import { NoAccessPanel } from "@/app/_components/no-access-panel";
 import { loadDeals } from "@/lib/deals-server";
 import { DealsView } from "./deals-view";
 
 /** Reads deals as the signed-in user (RLS: editors and admins only). */
 async function DealsData() {
   const user = await requireUser();
-  if (!canUseDeals(user.role)) redirect(homePathFor(user.role)); // backstop for proxy.ts
+  if (!canUseDeals(user.role)) return <NoAccessPanel user={user} area="Deals" allowed="editors and admins" />;
 
   const result = await loadDeals();
   if ("error" in result) {
@@ -18,7 +18,12 @@ async function DealsData() {
       </div>
     );
   }
-  return <DealsView rows={result.rows} canEdit={canUseDeals(user.role)} />;
+  return (
+    <>
+      <h1 className="text-title-2">Deals</h1>
+      <DealsView rows={result.rows} canEdit={canUseDeals(user.role)} />
+    </>
+  );
 }
 
 function DealsSkeleton() {
@@ -45,7 +50,6 @@ function DealsSkeleton() {
 export default function DealsPage() {
   return (
     <section className="flex flex-col gap-3">
-      <h1 className="text-title-2">Deals</h1>
       <Suspense fallback={<DealsSkeleton />}>
         <DealsData />
       </Suspense>
