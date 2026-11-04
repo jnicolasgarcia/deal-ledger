@@ -44,6 +44,16 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   };
 });
 
+/** Editors and admins work in the deals grid; viewers only see the weekly review. */
+export function canUseDeals(role: AppRole | null): boolean {
+  return role === "editor" || role === "admin";
+}
+
+/** Where "/" sends a user: the deals grid for editors and admins, the weekly review otherwise. */
+export function homePathFor(role: AppRole | null): "/deals" | "/weekly" {
+  return canUseDeals(role) ? "/deals" : "/weekly";
+}
+
 /** The signed-in user, or a redirect to /login. */
 export async function requireUser(): Promise<CurrentUser> {
   const user = await getCurrentUser();

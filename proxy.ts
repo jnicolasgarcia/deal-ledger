@@ -42,6 +42,23 @@ export async function proxy(request: NextRequest) {
 
   if (!signedIn && !isPublic) return redirectTo("/login", request, response, cacheHeaders);
   if (signedIn && isPublic) return redirectTo("/", request, response, cacheHeaders);
+
+  // Role-based routing, only where it matters (one profile read through RLS).
+  // UX only: the database still decides what each role can read.
+  const path = request.nextUrl.pathname;
+  const isDeals = path === "/deals" || path.startsWith("/deals/");
+  if (signedIn && (path === "/" || isDeals)) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("user_id", data!.claims.sub)
+      .maybeSingle();
+    const canUseDeals = profile?.role === "editor" || profile?.role === "admin";
+    if (path === "/") {
+      return redirectTo(canUseDeals ? "/deals" : "/weekly", request, response, cacheHeaders);
+    }
+    if (!canUseDeals) return redirectTo("/weekly", request, response, cacheHeaders);
+  }
   return response;
 }
 

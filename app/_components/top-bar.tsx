@@ -1,7 +1,14 @@
 import Link from "next/link";
 import { Suspense } from "react";
+import { canUseDeals, requireUser } from "@/lib/auth";
 import { NavLinks } from "./nav-links";
 import { UserMenu, UserMenuSkeleton } from "./user-menu";
+
+/** Nav depends on the role, so it streams in with the session. */
+async function RoleNav() {
+  const user = await requireUser();
+  return <NavLinks showDeals={canUseDeals(user.role)} />;
+}
 
 export function TopBar() {
   return (
@@ -10,7 +17,9 @@ export function TopBar() {
         <Link href="/" className="text-headline tracking-tight text-ink">
           Deal Ledger
         </Link>
-        <NavLinks />
+        <Suspense fallback={<nav aria-label="Main" className="h-8" />}>
+          <RoleNav />
+        </Suspense>
         <div className="ml-auto">
           <Suspense fallback={<UserMenuSkeleton />}>
             <UserMenu />

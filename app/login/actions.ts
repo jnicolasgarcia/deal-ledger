@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { getDb } from "@/lib/supabase/server";
+import { homePathFor, type AppRole } from "@/lib/auth";
 
 export type SignInState = { error: string | null; email: string };
 
@@ -16,14 +17,22 @@ export async function signIn(_prev: SignInState, formData: FormData): Promise<Si
   if (password.length > 256) return { error: "Email or password is incorrect.", email };
 
   const db = await getDb();
-  const { error } = await db.auth.signInWithPassword({ email, password });
-  if (error) {
+  const { data, error } = await db.auth.signInWithPassword({ email, password });
+  if (error || !data.user) {
     // Don't say which of the two was wrong.
     const message =
-      error.code === "invalid_credentials"
+      error?.code === "invalid_credentials"
         ? "Email or password is incorrect."
         : "Couldn't sign in right now. Try again in a moment.";
     return { error: message, email };
   }
-  redirect("/");
+
+  // Go straight to the role's home: a redirect from a server action renders
+  // its target without passing through proxy.ts again.
+  const { data: profile } = await db
+    .from("profiles")
+    .select("role")
+    .eq("user_id", data.user.id)
+    .maybeSingle();
+  redirect(homePathFor((profile?.role as AppRole | undefined) ?? null));
 }

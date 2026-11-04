@@ -4,15 +4,16 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const LINKS = [
-  { href: "/deals", label: "Deals" },
-  { href: "/weekly", label: "Weekly review" },
+  { href: "/deals", label: "Deals", dealsOnly: true },
+  { href: "/weekly", label: "Weekly review", dealsOnly: false },
 ] as const;
 
-export function NavLinks() {
+/** Main nav. The Deals link is hidden for viewers (showDeals = false). */
+export function NavLinks({ showDeals }: { showDeals: boolean }) {
   const pathname = usePathname();
   return (
     <nav className="flex items-center gap-1" aria-label="Main">
-      {LINKS.map(({ href, label }) => {
+      {LINKS.filter((l) => showDeals || !l.dealsOnly).map(({ href, label }) => {
         const active = pathname === href || pathname.startsWith(`${href}/`);
         return (
           <Link
