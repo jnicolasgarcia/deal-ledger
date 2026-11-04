@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { homePathFor, requireUser } from "@/lib/auth";
-import { signOut } from "@/app/(app)/actions";
+import { SignOutButton } from "@/app/_components/sign-out-button";
 
 /** Signed in, but no role yet (005). */
 async function NoAccess() {
@@ -13,14 +13,9 @@ async function NoAccess() {
         You&apos;re signed in as <span className="text-ink">{user.email ?? user.name}</span>, but your account
         hasn&apos;t been given access to Deal Ledger. Ask an admin to give you access, then sign in again.
       </p>
-      <form action={signOut} className="mt-8">
-        <button
-          type="submit"
-          className="h-11 w-full rounded-md bg-accent text-headline text-white transition-colors hover:bg-accent-hover"
-        >
-          Sign out
-        </button>
-      </form>
+      <div className="mt-8">
+        <SignOutButton className="h-11 w-full rounded-md bg-accent text-headline text-white transition-colors hover:bg-accent-hover" />
+      </div>
     </>
   );
 }

@@ -1,5 +1,5 @@
 import { requireUser, ROLE_LABELS } from "@/lib/auth";
-import { signOut } from "@/app/(app)/actions";
+import { SignOutButton } from "./sign-out-button";
 
 /** Signed-in user's name, role and sign out. Reads the session: render inside <Suspense>. */
 export async function UserMenu() {
@@ -12,14 +12,7 @@ export async function UserMenu() {
           {user.role ? ROLE_LABELS[user.role] : "No role"}
         </span>
       </div>
-      <form action={signOut}>
-        <button
-          type="submit"
-          className="rounded-md px-3 py-1.5 text-callout text-accent transition-colors hover:bg-accent-soft"
-        >
-          Sign out
-        </button>
-      </form>
+      <SignOutButton className="rounded-md px-3 py-1.5 text-callout text-accent transition-colors hover:bg-accent-soft" />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import { BfcacheGuard } from "./_components/bfcache-guard";
 
 // Fallback only: Apple devices use SF Pro through -apple-system (see globals.css).
 const inter = Inter({
@@ -17,7 +18,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${inter.variable} h-full`}>
-      <body className="min-h-full">{children}</body>
+      <body className="min-h-full">
+        <BfcacheGuard />
+        {children}
+      </body>
     </html>
   );
 }

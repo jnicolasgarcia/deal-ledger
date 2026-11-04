@@ -10,6 +10,7 @@ import {
   type DealRow,
   type HistoryEntry,
 } from "@/lib/deals";
+import { locationOf } from "@/lib/weekly";
 import { getDealHistory } from "./actions";
 import { Assumption, NotAvailable, dateTimeFormat } from "./cells";
 
@@ -19,6 +20,19 @@ function Row({ label, children, mono = false }: { label: string; children: React
       <dt className="text-footnote text-ink-secondary">{label}</dt>
       <dd className={`min-w-0 text-callout break-words ${mono ? "font-mono text-footnote" : ""}`}>{children}</dd>
     </div>
+  );
+}
+
+/** Same rule as the weekly cards: the address, else "San Diego, CA (no address)", else "No address". */
+function SheetTitle({ deal }: { deal: DealRow }) {
+  if (deal.address) return <>{deal.address}</>;
+  const location = deal.city ? locationOf(deal) : null;
+  if (!location) return <span className="text-ink-tertiary">No address</span>;
+  return (
+    <>
+      {location}
+      <span className="font-normal text-ink-tertiary"> (no address)</span>
+    </>
   );
 }
 
@@ -107,7 +121,7 @@ export function DealSheet({ deal, onClose }: { deal: DealRow | null; onClose: ()
         <header className="flex items-start gap-3 border-b border-hairline px-5 py-4">
           <div className="min-w-0 flex-1">
             <h2 id="deal-sheet-title" className="text-title-3 break-words">
-              {deal.address ?? <span className="text-ink-tertiary">No address</span>}
+              <SheetTitle deal={deal} />
             </h2>
             <p className="mt-0.5 text-footnote text-ink-secondary">
               {[deal.client, deal.vertical, deal.market].filter(Boolean).join(" · ")}

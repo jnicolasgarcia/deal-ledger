@@ -134,6 +134,11 @@
   }
 }
 
+/* Set as a page goes into the back/forward cache; it reloads on restore (BfcacheGuard). */
+html.bfcache-hidden body {
+  visibility: hidden;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
