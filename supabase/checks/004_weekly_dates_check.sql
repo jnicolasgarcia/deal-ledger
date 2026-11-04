@@ -14,12 +14,13 @@ language sql as $$
   values (p_name, case when p_pass then 'PASS' else 'FAIL' end, p_detail);
 $$;
 
+-- Column list as of 006 (which added city and state).
 select pg_temp.ok('returns the weekly columns plus updated_at and imported_at',
   pg_get_function_result('public.get_weekly_review()'::regprocedure) =
-  'TABLE(id uuid, vertical text, market text, address text, stage deal_stage, list_price numeric, '
-  'bldg_sf numeric, list_price_per_sf numeric, lot_sf numeric, notes text, assumption_fields text[], '
-  'days_in_stage integer, previous_stage deal_stage, updated_at timestamp with time zone, '
-  'imported_at timestamp with time zone)',
+  'TABLE(id uuid, vertical text, market text, address text, city text, state text, stage deal_stage, '
+  'list_price numeric, bldg_sf numeric, list_price_per_sf numeric, lot_sf numeric, notes text, '
+  'assumption_fields text[], days_in_stage integer, previous_stage deal_stage, '
+  'updated_at timestamp with time zone, imported_at timestamp with time zone)',
   pg_get_function_result('public.get_weekly_review()'::regprocedure));
 
 select pg_temp.ok('execute: anon none, authenticated yes',

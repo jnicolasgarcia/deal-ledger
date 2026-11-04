@@ -5,12 +5,15 @@
  */
 import { STAGES, isStage, type Stage } from "@/lib/stages";
 
-/** One row of get_weekly_review() (004). */
+/** One row of get_weekly_review() (006). */
 export type WeeklyRow = {
   id: string;
   vertical: string;
   market: string | null;
   address: string | null;
+  /** The property's city and state (not the search market). */
+  city: string | null;
+  state: string | null;
   stage: Stage;
   list_price: number | null;
   bldg_sf: number | null;
@@ -37,6 +40,17 @@ const CARD_ORDER: Stage[] = ["in_contract", "negotiating_psa", "negotiating_loi"
 const PARKED: Stage[] = ["closed", "on_hold"];
 /** Active = in the funnel and not finished or paused. Unknown is counted on its own. */
 const ACTIVE: Stage[] = ["sourcing", "in_pipeline", "pre_loi", "negotiating_loi", "negotiating_psa", "in_contract"];
+
+/** "Culver City, CA", or null when neither is known. */
+export function locationOf(deal: Pick<WeeklyRow, "city" | "state">): string | null {
+  const parts = [deal.city, deal.state].filter((p): p is string => !!p && p.trim() !== "");
+  return parts.length ? parts.join(", ") : null;
+}
+
+/** True when $, SF, $/SF and lot size are all missing. */
+export function hasNoFigures(deal: Pick<WeeklyRow, "list_price" | "bldg_sf" | "list_price_per_sf" | "lot_sf">): boolean {
+  return deal.list_price === null && deal.bldg_sf === null && deal.list_price_per_sf === null && deal.lot_sf === null;
+}
 
 export function verticalSlug(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "unknown";
