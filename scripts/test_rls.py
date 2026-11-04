@@ -42,6 +42,7 @@ EXPECTED: dict[str, dict[str, bool]] = {
     "read own profile":            {"signed out": False, "viewer": True,  "editor": True,  "admin": True},
     "read another user's profile": {"signed out": False, "viewer": False, "editor": False, "admin": True},
     "change a role":               {"signed out": False, "viewer": False, "editor": False, "admin": True},
+    "call get_profile_names":      {"signed out": False, "viewer": False, "editor": True,  "admin": True},
 }
 
 
@@ -120,6 +121,8 @@ def main() -> int:
                 lambda: c.table("profiles").select("user_id").eq("user_id", other).execute()),
             "change a role": attempt(
                 lambda: c.table("profiles").update({"role": new_role}).eq("user_id", user_ids["viewer"]).execute()),
+            "call get_profile_names": attempt(
+                lambda: c.rpc("get_profile_names", {"user_ids": [user_ids["admin"], user_ids["viewer"]]}).execute()),
         }
         ev = out["read deal_events"]
         if not events_exist and ev.detail.startswith("0 row"):

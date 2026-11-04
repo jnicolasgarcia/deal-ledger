@@ -112,3 +112,10 @@ shows n/a for blanks.
 - **Sale Status and Days On Market:** these describe the property's listing.
   Attributes only, never used for the stage or for stage dates.
   `stage_changed_at` is null on import.
+
+## 6. Known limitations
+
+- **Attributes are read-only in the app.** update_deal can change keys
+  inside `attributes`, but the UI doesn't offer it: editing an attribute
+  would interact with its assumption flag, and assumptions can't be
+  confirmed yet. Both come together in a later step.

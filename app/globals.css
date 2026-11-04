@@ -56,7 +56,7 @@
   --color-surface-muted: #fafafc;     /* zebra rows, wells */
   --color-ink: #1d1d1f;               /* primary text */
   --color-ink-secondary: #6e6e73;     /* secondary text, 5.1:1 on white */
-  --color-ink-tertiary: #86868b;      /* hints, placeholders (not body text) */
+  --color-ink-tertiary: #76767b;      /* muted: n/a, hints, placeholders. 4.5:1 on white */
   --color-separator: #d2d2d7;
   --color-hairline: rgb(0 0 0 / 0.08);
   --color-accent: #0071e3;            /* the one accent blue */
@@ -92,6 +92,7 @@
   --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
   --animate-fade-in: fade-in 240ms var(--ease-out-soft) both;
   --animate-rise-in: rise-in 320ms var(--ease-out-soft) both;
+  --animate-sheet-in: sheet-in 280ms var(--ease-out-soft) both;
 
   @keyframes fade-in {
     from { opacity: 0; }
@@ -100,6 +101,10 @@
   @keyframes rise-in {
     from { opacity: 0; transform: translateY(6px); }
     to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes sheet-in {
+    from { transform: translateX(24px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
   }
 }
 
@@ -136,4 +141,10 @@
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* Deals grid: editable cells hint on hover (double-click or Enter to edit). */
+.ag-cell.deal-editable:hover {
+  background-color: rgb(0 113 227 / 0.06);
+  cursor: text;
 }
