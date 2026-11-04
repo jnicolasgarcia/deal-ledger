@@ -4,13 +4,16 @@
 - contact_tracker -> public.contacts (upsert on source_tab, source_row)
 - target_weekly_view is a reference shape and is not loaded.
 
-Never skips a row: anything that can't be parsed is left null in its typed
-column, kept raw in attributes, and reported as an issue.
+Never skips a source row: anything that can't be parsed is left null in its
+typed column, kept raw in attributes, and reported as an issue. The one
+exception is protective: a deal already edited in the app (updated_by set,
+or any deal_events row) is not overwritten, and is listed as skipped.
 
 Usage:
   python scripts/ingest.py [--dry-run] [--source path/to/source.xlsx]
 
-Exit codes: 0 ok, 1 rows read != rows written for some tab, 2 setup error.
+Exit codes: 0 ok, 1 rows read != rows written + skipped for some tab,
+2 setup error.
 """
 
 from __future__ import annotations
@@ -101,6 +104,7 @@ class TabResult:
     kind: str
     rows_read: int = 0
     rows_written: int = 0
+    skipped: list[dict[str, Any]] = field(default_factory=list)  # edited in the app
     payloads: list[dict[str, Any]] = field(default_factory=list)
 
 
@@ -376,6 +380,59 @@ def connect():
     return create_client(url, key)
 
 
+def is_edited(deal: dict[str, Any]) -> str | None:
+    """Why a deal counts as edited in the app, or None. updated_by alone isn't
+    enough: it becomes null if the editing user is deleted, but events stay."""
+    reasons = []
+    if deal.get("updated_by"):
+        reasons.append("updated_by set")
+    n_events = len(deal.get("deal_events") or [])
+    if n_events:
+        reasons.append(f"{n_events} deal_events")
+    return ", ".join(reasons) or None
+
+
+def fetch_edited(client) -> list[dict[str, Any]]:
+    """Deals edited in the app. Ingest must not overwrite them."""
+    deals: list[dict[str, Any]] = []
+    page = 1000
+    while True:  # PostgREST caps rows per request
+        resp = (client.table("deals")
+                .select("natural_key, source_tab, source_row, updated_by, updated_at, deal_events(id)")
+                .order("natural_key")
+                .range(len(deals), len(deals) + page - 1)
+                .execute())
+        batch = resp.data or []
+        deals.extend(batch)
+        if len(batch) < page:
+            break
+    edited = []
+    for d in deals:
+        reason = is_edited(d)
+        if reason:
+            edited.append({**d, "reason": reason})
+    return edited
+
+
+def protect_edited(results: list[TabResult], edited: list[dict[str, Any]]) -> None:
+    """Move payloads that match an app-edited deal (by natural_key or source row) to skipped."""
+    by_key = {e["natural_key"]: e for e in edited}
+    by_src = {(e["source_tab"], e["source_row"]): e for e in edited}
+    for r in results:
+        if r.kind != "deals":
+            continue
+        keep = []
+        for p in r.payloads:
+            hit = by_key.get(p["natural_key"]) or by_src.get((p["source_tab"], p["source_row"]))
+            if hit:
+                r.skipped.append({"source_row": p["source_row"], "natural_key": hit["natural_key"],
+                                  "reason": hit.get("reason", "updated_by set"),
+                                  "updated_by": hit["updated_by"], "updated_at": hit["updated_at"]})
+            else:
+                keep.append(p)
+        r.payloads = keep
+
+
 def write(client, result: TabResult, issues: list[Issue]) -> None:
     table, conflict = ("deals", "natural_key") if result.kind == "deals" else ("contacts", "source_tab,source_row")
     if not result.payloads:
@@ -419,34 +476,47 @@ def main(argv: list[str] | None = None) -> int:
         else:
             results.append(load_deal_tab(ws, issues, used_keys))
 
+    edit_check = "done"
+    try:
+        client = connect()
+    except SystemExit as exc:
+        if not args.dry_run:
+            print(exc, file=sys.stderr)
+            return 2
+        client = None
+        edit_check = f"not checked ({exc})"
+    if client is not None:
+        protect_edited(results, fetch_edited(client))
+
     if args.dry_run:
         for r in results:
             r.rows_written = len(r.payloads)
     else:
-        try:
-            client = connect()
-        except SystemExit as exc:
-            print(exc, file=sys.stderr)
-            return 2
         for r in results:
             write(client, r, issues)
 
     written_label = "would write" if args.dry_run else "rows written"
     print(f"\n{'DRY RUN, nothing written' if args.dry_run else 'Ingest'}: {args.source}\n")
-    print(f"{'tab':<24} {'table':<9} {'rows read':>9} {written_label:>12} {'issues':>7}")
+    print(f"{'tab':<24} {'table':<9} {'rows read':>9} {written_label:>12} {'skipped':>8} {'issues':>7}")
     for r in results:
         n = sum(1 for i in issues if i.tab == r.tab)
-        print(f"{r.tab:<24} {r.kind:<9} {r.rows_read:>9} {r.rows_written:>12} {n:>7}")
+        print(f"{r.tab:<24} {r.kind:<9} {r.rows_read:>9} {r.rows_written:>12} {len(r.skipped):>8} {n:>7}")
     for t in not_loaded:
         print(f"{t:<24} {'-':<9} {'not loaded (reference tab)':>31}")
+
+    skipped = [(r.tab, s) for r in results for s in r.skipped]
+    print(f"\nSkipped, edited in the app ({len(skipped)}; edit check {edit_check}):")
+    for tab, s in skipped:
+        print(f"  {{tab: {tab}, row: {s['source_row']}, natural_key: {s['natural_key']}, "
+              f"reason: {s['reason']}, updated_by: {s['updated_by']}, updated_at: {s['updated_at']}}}")
 
     print(f"\nIssues ({len(issues)}):")
     for i in issues:
         print(f"  {{tab: {i.tab}, row: {i.row if i.row is not None else '-'}, problem: {i.problem}}}")
 
-    mismatched = [r.tab for r in results if r.rows_read != r.rows_written]
+    mismatched = [r.tab for r in results if r.rows_read != r.rows_written + len(r.skipped)]
     if mismatched:
-        print(f"\nRows read != rows written for: {', '.join(mismatched)}", file=sys.stderr)
+        print(f"\nRows read != rows written + skipped for: {', '.join(mismatched)}", file=sys.stderr)
         return 1
     return 0
 

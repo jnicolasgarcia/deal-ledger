@@ -135,3 +135,34 @@ def test_client_name_mismatch_reported():
     res = load_deal_tab(ws, issues, {})
     assert res.payloads[0]["vertical"] == "Food"  # vertical unchanged
     assert any("doesn't match tab name part" in i.problem for i in issues)
+
+
+def test_protect_edited_skips_by_key_or_source_row():
+    from ingest import TabResult, protect_edited
+    r = TabResult("food_clientA_nyc", "deals", rows_read=3)
+    r.payloads = [
+        {"natural_key": "client a|1 main st", "source_tab": "food_clientA_nyc", "source_row": 2},
+        {"natural_key": "client a|2 main st", "source_tab": "food_clientA_nyc", "source_row": 3},
+        {"natural_key": "food_clientA_nyc:4", "source_tab": "food_clientA_nyc", "source_row": 4},
+    ]
+    contacts = TabResult("contact_tracker", "contacts", rows_read=1)
+    contacts.payloads = [{"source_tab": "contact_tracker", "source_row": 2}]
+    edited = [
+        {"natural_key": "client a|1 main st", "source_tab": "food_clientA_nyc", "source_row": 2,
+         "updated_by": "u1", "updated_at": "t"},
+        # address edited in the app: key differs, source row still matches
+        {"natural_key": "food_clientA_nyc:4", "source_tab": "food_clientA_nyc", "source_row": 4,
+         "updated_by": "u2", "updated_at": "t"},
+    ]
+    protect_edited([r, contacts], edited)
+    assert [p["source_row"] for p in r.payloads] == [3]
+    assert [s["source_row"] for s in r.skipped] == [2, 4]
+    assert len(contacts.payloads) == 1 and contacts.skipped == []
+
+
+def test_is_edited_uses_updated_by_or_events():
+    from ingest import is_edited
+    assert is_edited({"updated_by": None, "deal_events": []}) is None
+    assert is_edited({"updated_by": "u1", "deal_events": []}) == "updated_by set"
+    # editing user deleted: updated_by is null, but events remain
+    assert is_edited({"updated_by": None, "deal_events": [{"id": 1}, {"id": 2}]}) == "2 deal_events"
