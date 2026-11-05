@@ -20,6 +20,17 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Demo accounts
+
+| Role | Email | What it can do |
+|---|---|---|
+| Admin | admin@demo.dealledger.test | Everything, plus users, roles and usage logs |
+| Editor | editor@demo.dealledger.test | View and edit deals, see the weekly review |
+| Viewer | viewer@demo.dealledger.test | Weekly review only |
+| No role | norole@demo.dealledger.test | Nothing until an admin grants access |
+
+The password is your-new-password
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
