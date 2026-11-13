@@ -1,12 +1,14 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { AgGridReact } from "ag-grid-react";
 import {
   AllCommunityModule,
   ModuleRegistry,
   themeQuartz,
   type CellClickedEvent,
+  type CellDoubleClickedEvent,
+  type CellEditingStartedEvent,
   type CellEditRequestEvent,
   type CellKeyDownEvent,
   type ColDef,
@@ -61,7 +63,7 @@ const SPECS: Spec[] = [
   text("vertical", "Vertical", true, 175),
   text("market", "Market", true, 100),
   text("city", "City", true, 130),
-  { colId: "stage", label: "Stage", visible: true, width: 160, cell: { kind: "stage" },
+  { colId: "stage", label: "Stage", visible: true, width: 170, cell: { kind: "stage" },
     sort: byStage as SortComparatorFn<DealRow> },
   text("address", "Address", true, 190),
   text("state", "State", true, 80),
@@ -100,6 +102,8 @@ function editorFor(field: EditableField): Partial<ColDef<DealRow>> {
     case "stage":
       return {
         ...base,
+        // Reads as a dropdown: one click opens it with the list showing (see onCellClicked).
+        cellClass: "deal-editable deal-editable-select",
         cellEditor: "agSelectCellEditor",
         cellEditorParams: { values: [...STAGES] },
         valueFormatter: (p) => stageMeta(p.value).label, // labels in the editor list
@@ -180,6 +184,11 @@ export function DealsGrid({ rows, attributeKeys, visible, canEdit, onOpen, onEdi
     [],
   );
 
+  // While the stage list is open, one Escape cancels the edit (the select
+  // widget would otherwise only close its list and stay in edit mode).
+  const stopEscape = useRef<(() => void) | null>(null);
+  useEffect(() => () => stopEscape.current?.(), []);
+
   // Fit the rows (plus header and horizontal scrollbar), up to the viewport,
   // so short lists don't leave a tall empty box.
   const height = `min(${rows.length * 36 + 38 + 16}px, calc(100dvh - 15rem))`;
@@ -198,8 +207,37 @@ export function DealsGrid({ rows, attributeKeys, visible, canEdit, onOpen, onEdi
           if (e.data && isEditableField(field)) onEdit(e.data, field, e.newValue);
         }}
         // Read-only cells open the details sheet; editable cells edit on double-click or Enter.
+        // Stage opens on a single click, started as if by Enter so its list shows at once.
         onCellClicked={(e: CellClickedEvent<DealRow>) => {
           if (e.data && !e.colDef.editable && e.colDef.colId !== "open") onOpen(e.data);
+          if (e.colDef.editable && e.colDef.colId === "stage" && e.rowIndex !== null && !e.api.getEditingCells().length) {
+            e.api.startEditingCell({ rowIndex: e.rowIndex, colKey: "stage", key: "Enter" });
+          }
+        }}
+        // A habitual double-click: the second click would close the list again, so reopen it.
+        onCellDoubleClicked={(e: CellDoubleClickedEvent<DealRow>) => {
+          if (e.colDef.editable && e.colDef.colId === "stage" && e.rowIndex !== null) {
+            e.api.stopEditing(true);
+            e.api.startEditingCell({ rowIndex: e.rowIndex, colKey: "stage", key: "Enter" });
+          }
+        }}
+        onCellEditingStarted={(e: CellEditingStartedEvent<DealRow>) => {
+          if (e.colDef.colId !== "stage" || e.rowIndex === null) return;
+          const rowIndex = e.rowIndex;
+          const onKey = (ev: KeyboardEvent) => {
+            if (ev.key !== "Escape") return;
+            ev.preventDefault();
+            ev.stopPropagation();
+            e.api.stopEditing(true); // cancel: no edit request, nothing saved
+            e.api.setFocusedCell(rowIndex, "stage");
+          };
+          window.addEventListener("keydown", onKey, true);
+          stopEscape.current?.();
+          stopEscape.current = () => window.removeEventListener("keydown", onKey, true);
+        }}
+        onCellEditingStopped={() => {
+          stopEscape.current?.();
+          stopEscape.current = null;
         }}
         onCellKeyDown={(e: CellKeyDownEvent<DealRow>) => {
           const key = (e.event as KeyboardEvent | null)?.key;

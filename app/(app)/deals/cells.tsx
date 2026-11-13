@@ -36,7 +36,24 @@ export function DealCell(props: CustomCellRendererProps<DealRow> & { cell: CellP
   switch (cell.kind) {
     case "stage": {
       const pill = <StagePill stage={row.stage} size="sm" />;
-      return isFieldAssumption(row, "stage") ? <Assumption>{pill}</Assumption> : pill;
+      const value = isFieldAssumption(row, "stage") ? <Assumption>{pill}</Assumption> : pill;
+      if (props.colDef?.editable !== true) return value; // read-only: unchanged
+      // Editable: a muted chevron at the right edge so the cell reads as a dropdown.
+      return (
+        <span className="flex h-full w-full items-center gap-2">
+          {value}
+          <svg
+            aria-hidden
+            data-stage-chevron
+            width="10"
+            height="10"
+            viewBox="0 0 10 10"
+            className="ml-auto shrink-0 text-ink-tertiary"
+          >
+            <path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+          </svg>
+        </span>
+      );
     }
     case "days": {
       if (row.days_in_stage === null) return <NotAvailable title={NO_STAGE_HISTORY_TOOLTIP} />;
