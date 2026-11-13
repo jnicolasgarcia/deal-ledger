@@ -2,19 +2,22 @@
 
 Part 1, database (always runs): signed out and as each demo user (run
 create_demo_users.py first), against RLS, grants and the database functions
-from migrations 002-006. Prints a pass/fail matrix against the expected role
+from migrations 002-007. Prints a pass/fail matrix against the expected role
 table.
 
 Part 2, app (with --app URL, e.g. --app http://localhost:3000): the app's own
-entry points over HTTP, as a browser would call them: the /auth/signout route
-and the deals server actions (saveDealField, getDealHistory). Needs a running
+entry points over HTTP, as a browser would call them: the /auth/signout route,
+the deals server actions (saveDealField, getDealHistory), the /admin page and
+the role change action (changeUserRole). Needs a running
 build of the app; action ids are read from .next/server/server-reference-manifest.json.
 
 Leaves data unchanged: allowed edits are no-ops (a value written back as it
 is: no write, no event), forbidden ones are refused before anything is
 written, and write probes target an id that doesn't exist. Non-admins attempt
 a real escalation (viewer -> admin); if one ever succeeds, the script restores
-the role and reports a failure. Sign-out is local (this browser only), so the
+the role and reports a failure. activity_log probes only try forbidden writes
+(the allowed page_view insert is covered by supabase/checks/007, which rolls
+back), and the admin's role calls are no-ops, which log nothing. Sign-out is local (this browser only), so the
 sign-out check ends only the session it creates for that purpose.
 
 Usage: python scripts/test_rls.py [--app http://localhost:3000]
@@ -27,6 +30,7 @@ import argparse
 import base64
 import json
 import os
+import re
 import sys
 from pathlib import Path
 from typing import Any, Callable
@@ -77,8 +81,17 @@ EXPECTED: dict[str, dict[str, bool | None]] = {
     "update_deal, natural_key":        {"signed out": F, "no role": F, "viewer": F, "editor": F, "admin": F},
     "update_deal, protected fields":   {"signed out": F, "no role": F, "viewer": F, "editor": F, "admin": F},
     "update_deal, bad values":         {"signed out": F, "no role": F, "viewer": F, "editor": F, "admin": F},
-    "change a role":                   {"signed out": F, "no role": F, "viewer": F, "editor": F, "admin": T},
+    "direct role update on profiles":  {"signed out": F, "no role": F, "viewer": F, "editor": F, "admin": F},
     "call internal functions":         {"signed out": F, "no role": F, "viewer": F, "editor": F, "admin": F},
+    # --- usage log (007)
+    "read activity_log":               {"signed out": F, "no role": F, "viewer": F, "editor": F, "admin": T},
+    "insert own page_view, no role":   {"signed out": X, "no role": F, "viewer": X, "editor": X, "admin": X},
+    "forge activity_log rows":         {"signed out": F, "no role": F, "viewer": F, "editor": F, "admin": F},
+    "update/delete activity_log":      {"signed out": F, "no role": F, "viewer": F, "editor": F, "admin": F},
+    "call get_admin_users":            {"signed out": F, "no role": F, "viewer": F, "editor": F, "admin": T},
+    "set_user_role (no-op / escalate)": {"signed out": F, "no role": F, "viewer": F, "editor": F, "admin": T},
+    "set_user_role on own role":       {"signed out": X, "no role": F, "viewer": F, "editor": F, "admin": F},
+    "call record_sign_in":             {"signed out": F, "no role": X, "viewer": X, "editor": X, "admin": X},
 }
 
 
@@ -202,11 +215,50 @@ def database_checks(url: str, key: str, password: str) -> tuple[list[tuple[str, 
                 ("negative", {"lot_sf": -1}), ("text in number", {"list_price": "abc"}), ("bad stage", {"stage": "won"}),
                 ("nested attribute", {"attributes": {"a": {"b": 1}}}), ("empty", {}),
             ]], {"22023"} if can_edit else edit_codes)
-        out["change a role"] = attempt(
+        # 008: no direct role updates for anyone; set_user_role is the only path.
+        out["direct role update on profiles"] = attempt(
             lambda: c.table("profiles").update({"role": new_role}).eq("user_id", user_ids["viewer"]).execute())
         out["call internal functions"] = attempt_denied(
-            [(fn, (lambda fn=fn: c.rpc(fn).execute())) for fn in ("handle_new_user", "set_updated_at", "prevent_last_admin_removal")],
+            [(fn, (lambda fn=fn: c.rpc(fn).execute())) for fn in
+             ("handle_new_user", "set_updated_at", "prevent_last_admin_removal", "log_deal_edits")],
             {"42501", "PGRST202", "42883", "0A000"})
+
+        # --- usage log (007). Every write here must be refused: nothing is stored.
+        log = lambda row: (lambda: c.table("activity_log").insert(row).execute())  # noqa: E731
+        me = own or NO_SUCH_ID
+        out["read activity_log"] = attempt(lambda: c.table("activity_log").select("id").limit(5).execute())
+        if actor == "no role":
+            out["insert own page_view, no role"] = attempt_denied(
+                [("page_view", log({"user_id": me, "action": "page_view", "page": "weekly"}))], edit_codes)
+        out["forge activity_log rows"] = attempt_denied([
+            ("other user's page_view", log({"user_id": other, "action": "page_view", "page": "weekly"})),
+            ("sign_in", log({"user_id": me, "action": "sign_in"})),
+            ("role_change", log({"user_id": me, "action": "role_change"})),
+            ("deal_edit", log({"user_id": me, "action": "deal_edit"})),
+            ("is_demo", log({"user_id": me, "action": "page_view", "page": "weekly", "is_demo": True})),
+            ("created_at", log({"user_id": me, "action": "page_view", "page": "weekly", "created_at": "2020-01-01T00:00:00Z"})),
+        ], edit_codes)
+        out["update/delete activity_log"] = attempt_denied([
+            ("update", lambda: c.table("activity_log").update({"detail": {}}).eq("id", NO_SUCH_ID).execute()),
+            ("delete", lambda: c.table("activity_log").delete().eq("id", NO_SUCH_ID).execute()),
+        ], edit_codes)
+        out["call get_admin_users"] = attempt(lambda: c.rpc("get_admin_users").execute())
+        if actor == "admin":  # viewer -> viewer: no change, no log row
+            out["set_user_role (no-op / escalate)"] = attempt(
+                lambda: c.rpc("set_user_role", {"target_user_id": user_ids["viewer"], "new_role": "viewer"}).execute(),
+                rows_mean_allowed=False)
+        else:  # a real escalation attempt: make themselves (or the viewer) admin
+            out["set_user_role (no-op / escalate)"] = attempt_denied(
+                [("escalate", lambda: c.rpc("set_user_role", {"target_user_id": own or user_ids["viewer"],
+                                                               "new_role": "admin"}).execute())], edit_codes)
+        if own:  # 008: nobody changes their own role, admins included
+            out["set_user_role on own role"] = attempt_denied(
+                # Always "admin": a no-op for the admin, so a missing guard shows as a FAIL
+                # without demoting the account; an escalation attempt for everyone else.
+                [("own role", lambda: c.rpc("set_user_role", {"target_user_id": own, "new_role": "admin"}).execute())],
+                edit_codes)
+        if actor == "signed out":
+            out["call record_sign_in"] = attempt_denied([("record_sign_in", lambda: c.rpc("record_sign_in").execute())], edit_codes)
 
         if not events_exist or not contacts_exist:
             for name, exists in (("read deal_events", events_exist), ("read contacts", contacts_exist)):
@@ -229,8 +281,17 @@ def database_checks(url: str, key: str, password: str) -> tuple[list[tuple[str, 
     role_now = clients["admin"].table("profiles").select("role").eq("user_id", user_ids["viewer"]).single().execute().data["role"]
     failures: list[tuple[str, str, str]] = []
     if role_now != "viewer":
-        clients["admin"].table("profiles").update({"role": "viewer"}).eq("user_id", user_ids["viewer"]).execute()
-        failures.append(("change a role", "-", f"viewer role was {role_now!r}; restored to viewer"))
+        clients["admin"].rpc("set_user_role", {"target_user_id": user_ids["viewer"], "new_role": "viewer"}).execute()
+        failures.append(("direct role update on profiles", "-", f"viewer role was {role_now!r}; restored to viewer"))
+    admin_role = clients["admin"].table("profiles").select("role").eq("user_id", user_ids["admin"]).single().execute().data["role"]
+    if admin_role != "admin":
+        failures.append(("set_user_role on own role", "admin", f"admin role is {admin_role!r}; restore with create_demo_users.py"))
+    for role in ("editor", "no role"):
+        got = clients["admin"].table("profiles").select("role").eq("user_id", user_ids[role]).single().execute().data["role"]
+        if got != (None if role == "no role" else role):
+            clients["admin"].rpc("set_user_role", {"target_user_id": user_ids[role],
+                                                   "new_role": None if role == "no role" else role}).execute()
+            failures.append(("set_user_role (no-op / escalate)", role, f"role was {got!r}; restored"))
     stage_now = clients["editor"].table("deals").select("stage").eq("id", deal["id"]).single().execute().data["stage"]
     if stage_now != deal["stage"]:
         failures.append(("update_deal, real stage change", "-", f"test deal stage changed to {stage_now!r}"))
@@ -256,7 +317,9 @@ def database_checks(url: str, key: str, password: str) -> tuple[list[tuple[str, 
     print("\nDetails (new checks):")
     for check in ("weekly returns only weekly cols", "profile names: names only", "direct insert/delete on deals",
                   "direct insert on deal_events", "update_deal, real stage change", "update_deal, protected fields",
-                  "update_deal, bad values", "call internal functions"):
+                  "update_deal, bad values", "call internal functions", "read activity_log",
+                  "forge activity_log rows", "set_user_role (no-op / escalate)", "set_user_role on own role",
+                  "direct role update on profiles"):
         for actor in ACTORS:
             if check in results[actor]:
                 print(f"  {check:<{width}} {actor:<11} {results[actor][check].detail}")
@@ -320,12 +383,12 @@ def app_checks(app: str, url: str, key: str, password: str, deal: dict) -> list[
         return [("app reachable", "app", str(exc))]
     manifest = json.loads(ACTION_MANIFEST.read_text())
     ids = {v.get("exportedName"): k for k, v in manifest.get("node", {}).items()}
-    save_id, history_id = ids.get("saveDealField"), ids.get("getDealHistory")
-    if not save_id or not history_id:
+    save_id, history_id, role_id = ids.get("saveDealField"), ids.get("getDealHistory"), ids.get("changeUserRole")
+    if not save_id or not history_id or not role_id:
         return [("server action ids", "app", f"not in {ACTION_MANIFEST}; run npm run build")]
 
     sessions: dict[str, Any] = {}
-    for role in ("editor", "viewer", "no role"):
+    for role in ("admin", "editor", "viewer", "no role"):
         c = create_client(url, key)
         sessions[role] = c.auth.sign_in_with_password({"email": EMAILS[role], "password": password}).session
     cookies = {"signed out": {}, **{r: session_cookies(url, s) for r, s in sessions.items()}}
@@ -352,6 +415,46 @@ def app_checks(app: str, url: str, key: str, password: str, deal: dict) -> list[
         res = action_result(call_action(app, "/deals", history_id, [events[0]["deal_id"]], cookies["editor"]))
         record("getDealHistory as editor: history returned", bool(res and res.get("ok") and res.get("entries")), f"{len((res or {}).get('entries') or [])} entries")
     editor.auth.sign_out()
+
+    # Admin page and role changes (007). The page is a friendly panel for
+    # non-admins and must not carry any user list; the action must refuse.
+    # React may split "{area} isn't" into two text nodes, so match the fixed part.
+    no_access = re.compile(r"isn(?:'|&#x27;|&#39;)t available to you")
+    other_email = EMAILS["viewer"]
+    for actor in ("editor", "viewer"):
+        r = httpx.get(f"{app}/admin", cookies=cookies[actor], timeout=30, follow_redirects=False)
+        record(f"GET /admin as {actor}: no-access panel, no user list",
+               r.status_code == 200 and bool(no_access.search(r.text)) and other_email not in r.text and "Last sign-in" not in r.text,
+               f"{r.status_code}, panel={bool(no_access.search(r.text))}, user list={other_email in r.text}")
+    r = httpx.get(f"{app}/admin", cookies=cookies["no role"], timeout=30, follow_redirects=False)
+    record("GET /admin as no role: redirect to /no-access", r.status_code == 307 and r.headers.get("location", "").endswith("/no-access"),
+           f"{r.status_code} -> {r.headers.get('location')}")
+    r = httpx.get(f"{app}/admin", timeout=30, follow_redirects=False)
+    record("GET /admin signed out: redirect to /login", r.status_code == 307 and r.headers.get("location", "").endswith("/login"),
+           f"{r.status_code} -> {r.headers.get('location')}")
+    r = httpx.get(f"{app}/admin", cookies=cookies["admin"], timeout=30, follow_redirects=False)
+    record("GET /admin as admin: users table and activity",
+           r.status_code == 200 and other_email in r.text and "Last sign-in" in r.text and "Activity" in r.text and not no_access.search(r.text),
+           f"{r.status_code}, user list={other_email in r.text}")
+
+    viewer_id = sessions["viewer"].user.id
+    for actor in ("signed out", "no role", "viewer", "editor"):
+        res = action_result(call_action(app, "/admin", role_id, [viewer_id, "admin"], cookies[actor]))
+        record(f"changeUserRole as {actor}: refused", res is not None and res.get("ok") is False, json.dumps(res)[:100])
+    res = action_result(call_action(app, "/admin", role_id, [viewer_id, "owner"], cookies["admin"]))
+    record("changeUserRole as admin, bad role: refused", res is not None and res.get("ok") is False, json.dumps(res)[:100])
+    res = action_result(call_action(app, "/admin", role_id, ["not-a-uuid", "viewer"], cookies["admin"]))
+    record("changeUserRole as admin, bad id: refused", res is not None and res.get("ok") is False, json.dumps(res)[:100])
+    # "admin" = a no-op on the admin's own role: a missing guard shows as a FAIL without demoting it.
+    res = action_result(call_action(app, "/admin", role_id, [sessions["admin"].user.id, "admin"], cookies["admin"]))
+    record("changeUserRole as admin, own role: refused", res is not None and res.get("ok") is False, json.dumps(res)[:100])
+    res = action_result(call_action(app, "/admin", role_id, [viewer_id, "viewer"], cookies["admin"]))
+    record("changeUserRole as admin, unchanged role: ok", res is not None and res.get("ok") is True, json.dumps(res)[:100])
+    probe = create_client(url, key)
+    probe.auth.sign_in_with_password({"email": EMAILS["viewer"], "password": password})
+    role_now = probe.table("profiles").select("role").eq("user_id", viewer_id).single().execute().data["role"]
+    record("viewer is still a viewer after the role calls", role_now == "viewer", f"role {role_now}")
+    probe.auth.sign_out({"scope": "local"})  # global would end the viewer session used below
 
     # Sign-out route. Signing out must need a same-site POST: a GET (an <img>
     # or a link on another site) or a cross-site form must not end the session.

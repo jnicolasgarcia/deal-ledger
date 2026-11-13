@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { canUseDeals, requireUser } from "@/lib/auth";
 import { NoAccessPanel } from "@/app/_components/no-access-panel";
+import { PageViewLogger } from "@/app/_components/page-view-logger";
 import { loadDeals } from "@/lib/deals-server";
 import { DealsView } from "./deals-view";
 
@@ -50,6 +51,7 @@ function DealsSkeleton() {
 export default function DealsPage() {
   return (
     <section className="flex flex-col gap-3">
+      <PageViewLogger page="deals" />
       <Suspense fallback={<DealsSkeleton />}>
         <DealsData />
       </Suspense>

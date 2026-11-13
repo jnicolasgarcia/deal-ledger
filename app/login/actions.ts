@@ -35,6 +35,11 @@ export async function signIn(_prev: SignInState, formData: FormData): Promise<Si
     return { error: message, field: "form", email };
   }
 
+  // Sets last_login_at and logs the sign-in (007). A logging failure must not
+  // block the sign-in.
+  const { error: logError } = await db.rpc("record_sign_in");
+  if (logError) console.error("record_sign_in failed:", logError.message);
+
   // Go straight to the role's home: a redirect from a server action renders
   // its target without passing through proxy.ts again.
   const { data: profile } = await db.from("profiles").select("role").eq("user_id", data.user.id).maybeSingle();

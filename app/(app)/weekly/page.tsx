@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { NO_ACCESS_PATH, requireUser } from "@/lib/auth";
 import { loadWeekly } from "@/lib/weekly-server";
+import { PageViewLogger } from "@/app/_components/page-view-logger";
 import { WeeklyView } from "./weekly-view";
 
 async function WeeklyData() {
@@ -44,6 +45,7 @@ function WeeklySkeleton() {
 export default function WeeklyPage() {
   return (
     <div className="py-2 print:py-0">
+      <PageViewLogger page="weekly" />
       <Suspense fallback={<WeeklySkeleton />}>
         <WeeklyData />
       </Suspense>
