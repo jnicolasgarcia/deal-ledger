@@ -154,6 +154,11 @@ html.bfcache-hidden body {
   cursor: text;
 }
 
+/* Stage: a dropdown, opened with one click. */
+.ag-cell.deal-editable-select:hover {
+  cursor: pointer;
+}
+
 /* Print: the weekly review in landscape, one vertical per page (see /weekly). */
 @media print {
   @page {
